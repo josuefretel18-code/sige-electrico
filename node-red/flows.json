@@ -1,22 +1,133 @@
 [
     {
-        "id": "7a74ced6b511994b",
-        "type": "function",
-        "z": "21df59d28fe696a3",
-        "name": "Preparar respuesta clima",
-        "func": "const respuesta = msg.payload;\n\nif (\n    !respuesta ||\n    !respuesta.main ||\n    !respuesta.wind\n) {\n    const estadoApi =\n        msg.statusCode || null;\n\n    msg.statusCode = 502;\n\n    msg.payload = {\n        ok: false,\n        mensaje: \"No se pudo obtener información meteorológica\",\n        estado_api_clima: estadoApi,\n        respuesta_api_clima: respuesta || null\n    };\n\n    return msg;\n}\n\nconst precipitacion =\n    respuesta.rain?.[\"1h\"] || 0;\n\nconst codigoClima =\n    respuesta.weather?.[0]?.id || null;\n\nconst descripcionClima =\n    respuesta.weather?.[0]?.description || \"\";\n\nconst vientoKmH =\n    Number(\n        (respuesta.wind.speed * 3.6)\n            .toFixed(2)\n    );\n\nmsg.statusCode = 200;\n\nmsg.payload = {\n    ok: true,\n\n    latitud: respuesta.coord.lat,\n    longitud: respuesta.coord.lon,\n\n    temperatura: respuesta.main.temp,\n\n    velocidad_viento: vientoKmH,\n\n    precipitacion: precipitacion,\n\n    codigo_clima: codigoClima,\n\n    descripcion_clima: descripcionClima,\n\n    fecha_hora_clima:\n        new Date(\n            respuesta.dt * 1000\n        ).toISOString()\n};\n\nmsg.headers = {\n    \"Content-Type\":\n        \"application/json; charset=utf-8\"\n};\n\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 630,
-        "y": 460,
-        "wires": [
-            [
-                "9bca0ad26657ae62"
-            ]
-        ]
+        "id":  "21df59d28fe696a3",
+        "type":  "tab",
+        "label":  "Clima SIGE",
+        "disabled":  false,
+        "info":  "",
+        "env":  [
+
+                ]
+    },
+    {
+        "id":  "809faf87b12fa7e7",
+        "type":  "http in",
+        "z":  "21df59d28fe696a3",
+        "name":  "Consultar clima",
+        "url":  "/clima",
+        "method":  "get",
+        "upload":  false,
+        "skipBodyParsing":  false,
+        "swaggerDoc":  "",
+        "x":  120,
+        "y":  400,
+        "wires":  [
+                      [
+                          "ea09dcf09548954e"
+                      ]
+                  ]
+    },
+    {
+        "id":  "ea09dcf09548954e",
+        "type":  "function",
+        "z":  "21df59d28fe696a3",
+        "name":  "Preparar coordenadas",
+        "func":  "const lat = Number(msg.req.query.lat);\nconst lon = Number(msg.req.query.lon);\n\nif (\n    !Number.isFinite(lat) ||\n    !Number.isFinite(lon) ||\n    lat \u003c -90 ||\n    lat \u003e 90 ||\n    lon \u003c -180 ||\n    lon \u003e 180\n) {\n    msg.statusCode = 400;\n\n    msg.payload = {\n        ok: false,\n        mensaje: \"Latitud y longitud no vÃ¡lidas\"\n    };\n\n    return [null, msg];\n}\n\nconst apiKey = env.get(\"WEATHER_API_KEY\");\n\nif (!apiKey) {\n    msg.statusCode = 500;\n\n    msg.payload = {\n        ok: false,\n        mensaje: \"WEATHER_API_KEY no estÃ¡ configurada\"\n    };\n\n    return [null, msg];\n}\n\nmsg.latitud = lat;\nmsg.longitud = lon;\n\nmsg.url =\n    \"https://api.openweathermap.org/data/2.5/weather\" +\n    \"?lat=\" + encodeURIComponent(lat) +\n    \"\u0026lon=\" + encodeURIComponent(lon) +\n    \"\u0026appid=\" + encodeURIComponent(apiKey) +\n    \"\u0026units=metric\" +\n    \"\u0026lang=es\";\n\nreturn [msg, null];",
+        "outputs":  2,
+        "timeout":  0,
+        "noerr":  0,
+        "initialize":  "",
+        "finalize":  "",
+        "libs":  [
+
+                 ],
+        "x":  260,
+        "y":  460,
+        "wires":  [
+                      [
+                          "2be3217eecf86bdb"
+                      ],
+                      [
+                          "6fdd5d568ecd3fe9"
+                      ]
+                  ]
+    },
+    {
+        "id":  "2be3217eecf86bdb",
+        "type":  "http request",
+        "z":  "21df59d28fe696a3",
+        "name":  "OpenWeather API",
+        "method":  "GET",
+        "ret":  "obj",
+        "paytoqs":  "ignore",
+        "url":  "",
+        "tls":  "",
+        "persist":  false,
+        "proxy":  "",
+        "insecureHTTPParser":  false,
+        "authType":  "",
+        "senderr":  false,
+        "headers":  [
+
+                    ],
+        "x":  430,
+        "y":  400,
+        "wires":  [
+                      [
+                          "7a74ced6b511994b"
+                      ]
+                  ]
+    },
+    {
+        "id":  "7a74ced6b511994b",
+        "type":  "function",
+        "z":  "21df59d28fe696a3",
+        "name":  "Preparar respuesta clima",
+        "func":  "const respuesta = msg.payload;\n\nif (\n    !respuesta ||\n    !respuesta.main ||\n    !respuesta.wind\n) {\n    const estadoApi =\n        msg.statusCode || null;\n\n    msg.statusCode = 502;\n\n    msg.payload = {\n        ok: false,\n        mensaje: \"No se pudo obtener informaciÃ³n meteorolÃ³gica\",\n        estado_api_clima: estadoApi,\n        respuesta_api_clima: respuesta || null\n    };\n\n    return msg;\n}\n\nconst precipitacion =\n    respuesta.rain?.[\"1h\"] || 0;\n\nconst codigoClima =\n    respuesta.weather?.[0]?.id || null;\n\nconst descripcionClima =\n    respuesta.weather?.[0]?.description || \"\";\n\nconst vientoKmH =\n    Number(\n        (respuesta.wind.speed * 3.6)\n            .toFixed(2)\n    );\n\nmsg.statusCode = 200;\n\nmsg.payload = {\n    ok: true,\n\n    latitud: respuesta.coord.lat,\n    longitud: respuesta.coord.lon,\n\n    temperatura: respuesta.main.temp,\n\n    velocidad_viento: vientoKmH,\n\n    precipitacion: precipitacion,\n\n    codigo_clima: codigoClima,\n\n    descripcion_clima: descripcionClima,\n\n    fecha_hora_clima:\n        new Date(\n            respuesta.dt * 1000\n        ).toISOString()\n};\n\nmsg.headers = {\n    \"Content-Type\":\n        \"application/json; charset=utf-8\"\n};\n\nreturn msg;",
+        "outputs":  1,
+        "timeout":  0,
+        "noerr":  0,
+        "initialize":  "",
+        "finalize":  "",
+        "libs":  [
+
+                 ],
+        "x":  630,
+        "y":  460,
+        "wires":  [
+                      [
+                          "9bca0ad26657ae62"
+                      ]
+                  ]
+    },
+    {
+        "id":  "9bca0ad26657ae62",
+        "type":  "http response",
+        "z":  "21df59d28fe696a3",
+        "name":  "Respuesta clima",
+        "statusCode":  "",
+        "headers":  {
+
+                    },
+        "x":  810,
+        "y":  560,
+        "wires":  [
+
+                  ]
+    },
+    {
+        "id":  "6fdd5d568ecd3fe9",
+        "type":  "http response",
+        "z":  "21df59d28fe696a3",
+        "name":  "Respuesta error",
+        "statusCode":  "",
+        "headers":  {
+
+                    },
+        "x":  400,
+        "y":  560,
+        "wires":  [
+
+                  ]
     }
 ]

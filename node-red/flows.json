@@ -1,0 +1,117 @@
+[
+    {
+        "id": "21df59d28fe696a3",
+        "type": "tab",
+        "label": "Clima SIGE",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "809faf87b12fa7e7",
+        "type": "http in",
+        "z": "21df59d28fe696a3",
+        "name": "Consultar clima",
+        "url": "/clima",
+        "method": "get",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 120,
+        "y": 400,
+        "wires": [
+            [
+                "ea09dcf09548954e"
+            ]
+        ]
+    },
+    {
+        "id": "ea09dcf09548954e",
+        "type": "function",
+        "z": "21df59d28fe696a3",
+        "name": "Preparar coordenadas",
+        "func": "const lat = Number(msg.req.query.lat);\nconst lon = Number(msg.req.query.lon);\n\nif (\n    !Number.isFinite(lat) ||\n    !Number.isFinite(lon) ||\n    lat < -90 ||\n    lat > 90 ||\n    lon < -180 ||\n    lon > 180\n) {\n    msg.statusCode = 400;\n\n    msg.payload = {\n        ok: false,\n        mensaje: \"Latitud y longitud no válidas\"\n    };\n\n    return [null, msg];\n}\n\nmsg.latitud = lat;\nmsg.longitud = lon;\n\nmsg.url =\n    \"https://api.open-meteo.com/v1/forecast\" +\n    \"?latitude=\" + encodeURIComponent(lat) +\n    \"&longitude=\" + encodeURIComponent(lon) +\n    \"&current=temperature_2m,precipitation,weather_code,wind_speed_10m\" +\n    \"&timezone=auto\";\n\nreturn [msg, null];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 260,
+        "y": 460,
+        "wires": [
+            [
+                "2be3217eecf86bdb"
+            ],
+            [
+                "6fdd5d568ecd3fe9"
+            ]
+        ]
+    },
+    {
+        "id": "2be3217eecf86bdb",
+        "type": "http request",
+        "z": "21df59d28fe696a3",
+        "name": "Open-Meteo API",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 430,
+        "y": 400,
+        "wires": [
+            [
+                "7a74ced6b511994b"
+            ]
+        ]
+    },
+    {
+        "id": "7a74ced6b511994b",
+        "type": "function",
+        "z": "21df59d28fe696a3",
+        "name": "Preparar respuesta clima",
+        "func": "const respuesta = msg.payload;\n\nif (!respuesta || !respuesta.current) {\n\n    msg.statusCode = 502;\n\n    msg.payload = {\n        ok: false,\n        mensaje: \"No se pudo obtener información meteorológica\"\n    };\n\n    return msg;\n}\n\nconst clima = respuesta.current;\n\nmsg.payload = {\n    ok: true,\n\n    latitud: respuesta.latitude,\n    longitud: respuesta.longitude,\n\n    temperatura: clima.temperature_2m,\n    velocidad_viento: clima.wind_speed_10m,\n    precipitacion: clima.precipitation,\n    codigo_clima: clima.weather_code,\n\n    fecha_hora_clima: clima.time\n};\n\nmsg.headers = {\n    \"Content-Type\": \"application/json; charset=utf-8\"\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 630,
+        "y": 460,
+        "wires": [
+            [
+                "9bca0ad26657ae62"
+            ]
+        ]
+    },
+    {
+        "id": "9bca0ad26657ae62",
+        "type": "http response",
+        "z": "21df59d28fe696a3",
+        "name": "Respuesta clima",
+        "statusCode": "",
+        "headers": {},
+        "x": 810,
+        "y": 560,
+        "wires": []
+    },
+    {
+        "id": "6fdd5d568ecd3fe9",
+        "type": "http response",
+        "z": "21df59d28fe696a3",
+        "name": "Respuesta error",
+        "statusCode": "",
+        "headers": {},
+        "x": 400,
+        "y": 560,
+        "wires": []
+    }
+]

@@ -107,7 +107,21 @@ CREATE TABLE IF NOT EXISTS operadores (
     activo BOOLEAN DEFAULT TRUE,
     fecha_creacion TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+-- 7. clima
+CREATE TABLE IF NOT EXISTS clima_incidencias (
+    id SERIAL PRIMARY KEY,
+    incidencia_id INTEGER NOT NULL,
+    temperatura DECIMAL(5,2),
+    velocidad_viento DECIMAL(6,2),
+    precipitacion DECIMAL(6,2),
+    codigo_clima INTEGER,
+    fecha_consulta TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
+    CONSTRAINT fk_clima_incidencia
+        FOREIGN KEY (incidencia_id)
+        REFERENCES incidencias(id)
+        ON DELETE CASCADE
+);
 
 -- ==========================================
 -- DATOS INICIALES

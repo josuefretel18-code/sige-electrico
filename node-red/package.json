@@ -1,0 +1,14 @@
+{
+  "name": "sige-node-red",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.9.0"
+  },
+  "scripts": {
+    "start": "node-red --settings settings.js flows.json"
+  },
+  "dependencies": {
+    "node-red": "5.0.4"
+  }
+}

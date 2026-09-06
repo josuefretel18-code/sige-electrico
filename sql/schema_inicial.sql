@@ -99,6 +99,14 @@ CREATE TABLE IF NOT EXISTS auditoria (
 
     fecha_hora TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+-- 7. Operadores
+CREATE TABLE IF NOT EXISTS operadores (
+    id SERIAL PRIMARY KEY,
+    codigo VARCHAR(30) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    activo BOOLEAN DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
 
 -- ==========================================

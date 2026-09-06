@@ -1,14 +1,96 @@
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-from db import obtener_conexion
+import os
 import uuid
-from datetime import datetime
+import jwt
+
+from functools import wraps
+from datetime import datetime, timedelta, timezone
+
+from flask import Flask, jsonify, request, g
+from flask_cors import CORS
+from werkzeug.security import check_password_hash
+
+from db import obtener_conexion
+
 
 app = Flask(__name__)
 CORS(app)
 
 app.json.ensure_ascii = False
 
+
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+
+if not JWT_SECRET_KEY:
+    raise RuntimeError(
+        "JWT_SECRET_KEY no está configurada en el archivo .env"
+    )
+
+
+def generar_token_operador(codigo):
+    ahora = datetime.now(timezone.utc)
+
+    payload = {
+        "sub": codigo,
+        "tipo": "OPERADOR",
+        "iat": ahora,
+        "exp": ahora + timedelta(hours=4)
+    }
+
+    return jwt.encode(
+        payload,
+        JWT_SECRET_KEY,
+        algorithm="HS256"
+    )
+
+
+def requiere_operador(funcion):
+
+    @wraps(funcion)
+    def decorador(*args, **kwargs):
+
+        autorizacion = request.headers.get(
+            "Authorization",
+            ""
+        )
+
+        if not autorizacion.startswith("Bearer "):
+            return jsonify({
+                "ok": False,
+                "mensaje": "Acceso no autorizado"
+            }), 401
+
+        token = autorizacion.split(" ", 1)[1]
+
+        try:
+            payload = jwt.decode(
+                token,
+                JWT_SECRET_KEY,
+                algorithms=["HS256"]
+            )
+
+            if payload.get("tipo") != "OPERADOR":
+                return jsonify({
+                    "ok": False,
+                    "mensaje": "Token no válido"
+                }), 401
+
+            g.operador_codigo = payload["sub"]
+
+        except jwt.ExpiredSignatureError:
+            return jsonify({
+                "ok": False,
+                "mensaje": "La sesión ha expirado"
+            }), 401
+
+        except jwt.InvalidTokenError:
+            return jsonify({
+                "ok": False,
+                "mensaje": "Token no válido"
+            }), 401
+
+        return funcion(*args, **kwargs)
+
+    return decorador
 
 @app.get("/")
 def inicio():
@@ -315,6 +397,7 @@ def listar_incidencias():
         }), 500
 
 @app.patch("/api/incidencias/<int:incidencia_id>/estado")
+@requiere_operador
 def cambiar_estado_incidencia(incidencia_id):
     try:
         datos = request.get_json(silent=True) or {}
@@ -544,6 +627,73 @@ def listar_auditoria():
         return jsonify({
             "ok": False,
             "mensaje": "Error al consultar auditoría",
+            "error": str(error)
+        }), 500
+
+@app.post("/api/auth/login")
+def login_operador():
+    try:
+        datos = request.get_json(silent=True) or {}
+
+        codigo = datos.get("codigo", "").strip().upper()
+        password = datos.get("password", "")
+
+        if not codigo or not password:
+            return jsonify({
+                "ok": False,
+                "mensaje": "Código y contraseña son obligatorios"
+            }), 400
+
+        with obtener_conexion() as conexion:
+            with conexion.cursor() as cursor:
+
+                cursor.execute("""
+                    SELECT password_hash, activo
+                    FROM operadores
+                    WHERE codigo = %s;
+                """, (codigo,))
+
+                operador = cursor.fetchone()
+
+                if (
+                    operador is None
+                    or not operador[1]
+                    or not check_password_hash(
+                        operador[0],
+                        password
+                    )
+                ):
+                    return jsonify({
+                        "ok": False,
+                        "mensaje": "Credenciales incorrectas"
+                    }), 401
+
+                token = generar_token_operador(codigo)
+
+                cursor.execute("""
+                    INSERT INTO auditoria (
+                        accion,
+                        tipo_actor,
+                        identificador_anonimo
+                    )
+                    VALUES (%s, %s, %s);
+                """, (
+                    "LOGIN_OPERADOR",
+                    "OPERADOR",
+                    codigo
+                ))
+
+        return jsonify({
+            "ok": True,
+            "mensaje": "Inicio de sesión correcto",
+            "operador": codigo,
+            "token": token
+        })
+
+    except Exception as error:
+        return jsonify({
+            "ok": False,
+            "mensaje": "Error al iniciar sesión",
             "error": str(error)
         }), 500
 

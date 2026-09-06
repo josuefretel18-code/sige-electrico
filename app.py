@@ -6,7 +6,13 @@ import requests
 from functools import wraps
 from datetime import datetime, timedelta, timezone
 
-from flask import Flask, jsonify, request, g
+from flask import (
+    Flask,
+    jsonify,
+    request,
+    g,
+    render_template
+)
 from flask_cors import CORS
 from werkzeug.security import check_password_hash
 
@@ -20,6 +26,7 @@ app.json.ensure_ascii = False
 
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+MAPS_API_KEY = os.getenv("MAPS_API_KEY", "")
 
 NODE_RED_URL = os.getenv(
     "NODE_RED_URL",
@@ -221,10 +228,10 @@ def guardar_clima_automatico(
 
 @app.get("/")
 def inicio():
-    return jsonify({
-        "sistema": "SIGE - Sistema de Gestión de Incidencias Eléctricas",
-        "estado": "API funcionando"
-    })
+    return render_template(
+        "index.html",
+        maps_api_key=MAPS_API_KEY
+    )
 
 
 @app.get("/api/health")

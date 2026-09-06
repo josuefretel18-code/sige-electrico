@@ -1,0 +1,132 @@
+body {
+  background-color: #f4f6f8;
+}
+
+.navbar-brand {
+  font-weight: bold;
+  font-size: 22px;
+}
+
+.card {
+  border: none;
+  border-radius: 12px;
+}
+
+h3 {
+  font-weight: 600;
+}
+
+
+/* =========================
+   MAPA PARA REPORTAR
+========================= */
+
+#map {
+  width: 100%;
+  height: 420px;
+
+  border-radius: 10px;
+
+  border:
+    1px solid #dee2e6;
+
+  background-color:
+    #e9ecef;
+}
+
+
+#latitud,
+#longitud {
+  background-color: #f8f9fa;
+}
+
+
+/* =========================
+   MAPA DE INCIDENCIAS
+========================= */
+
+#mapaIncidencias {
+  width: 100%;
+  height: 520px;
+
+  border-radius: 10px;
+
+  border:
+    1px solid #dee2e6;
+
+  background-color:
+    #e9ecef;
+}
+
+
+/* =========================
+   NAVEGACIÓN
+========================= */
+
+.nav-pills .nav-link {
+  margin: 0 5px;
+}
+
+
+/* =========================
+   VENTANA DEL MARCADOR
+========================= */
+
+.info-incidencia {
+  min-width: 220px;
+}
+
+.info-incidencia h6 {
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 768px) {
+
+  #map {
+    height: 350px;
+  }
+
+  #mapaIncidencias {
+    height: 400px;
+  }
+
+}
+
+
+/* =========================
+   PANEL DEL OPERADOR
+========================= */
+
+.incidencia-operador {
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 15px;
+  background-color: #ffffff;
+}
+
+.incidencia-operador:hover {
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+}
+
+.estado-badge {
+  font-size: 12px;
+}
+
+.codigo-incidencia {
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.acciones-operador {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 15px;
+}

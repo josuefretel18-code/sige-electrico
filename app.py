@@ -1,6 +1,7 @@
 import os
 import uuid
 import jwt
+import requests
 
 from functools import wraps
 from datetime import datetime, timedelta, timezone
@@ -19,6 +20,11 @@ app.json.ensure_ascii = False
 
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+
+NODE_RED_URL = os.getenv(
+    "NODE_RED_URL",
+    "http://127.0.0.1:1881"
+).rstrip("/")
 
 if not JWT_SECRET_KEY:
     raise RuntimeError(
@@ -697,6 +703,125 @@ def login_operador():
             "error": str(error)
         }), 500
 
+@app.post("/api/incidencias/<int:incidencia_id>/clima")
+@requiere_operador
+def consultar_clima_incidencia(incidencia_id):
+    conexion = None
+
+    try:
+        conexion = obtener_conexion()
+
+        # 1. Obtener coordenadas de la incidencia
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, latitud, longitud
+                FROM incidencias
+                WHERE id = %s
+                """,
+                (incidencia_id,)
+            )
+
+            incidencia = cursor.fetchone()
+
+        if not incidencia:
+            return jsonify({
+                "ok": False,
+                "mensaje": "Incidencia no encontrada"
+            }), 404
+
+        latitud = float(incidencia[1])
+        longitud = float(incidencia[2])
+
+        # 2. Consultar Node-RED
+        respuesta = requests.get(
+            f"{NODE_RED_URL}/clima",
+            params={
+                "lat": latitud,
+                "lon": longitud
+            },
+            timeout=60
+        )
+
+        if respuesta.status_code != 200:
+            return jsonify({
+                "ok": False,
+                "mensaje": "El servicio de clima respondió con error"
+            }), 502
+
+        clima = respuesta.json()
+
+        if not clima.get("ok"):
+            return jsonify({
+                "ok": False,
+                "mensaje": "No se pudo obtener información del clima"
+            }), 502
+
+        # 3. Guardar clima en Aiven
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO clima_incidencias (
+                    incidencia_id,
+                    temperatura,
+                    velocidad_viento,
+                    precipitacion,
+                    codigo_clima
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id, fecha_consulta
+                """,
+                (
+                    incidencia_id,
+                    clima.get("temperatura"),
+                    clima.get("velocidad_viento"),
+                    clima.get("precipitacion"),
+                    clima.get("codigo_clima")
+                )
+            )
+
+            registro = cursor.fetchone()
+
+        conexion.commit()
+
+        return jsonify({
+            "ok": True,
+            "mensaje": "Clima consultado y registrado correctamente",
+            "clima_id": registro[0],
+            "incidencia_id": incidencia_id,
+            "temperatura": clima.get("temperatura"),
+            "velocidad_viento": clima.get("velocidad_viento"),
+            "precipitacion": clima.get("precipitacion"),
+            "codigo_clima": clima.get("codigo_clima"),
+            "descripcion_clima": clima.get("descripcion_clima"),
+            "fecha_consulta": registro[1].isoformat()
+        }), 201
+
+    except requests.RequestException as error:
+        if conexion:
+            conexion.rollback()
+
+        print(f"Error Node-RED: {error}")
+
+        return jsonify({
+            "ok": False,
+            "mensaje": "No se pudo conectar con el servicio de clima"
+        }), 502
+
+    except Exception as error:
+        if conexion:
+            conexion.rollback()
+
+        print(f"Error al consultar clima: {error}")
+
+        return jsonify({
+            "ok": False,
+            "mensaje": "Error interno al consultar el clima"
+        }), 500
+
+    finally:
+        if conexion:
+            conexion.close()
        
 if __name__ == "__main__":
     app.run(debug=True)

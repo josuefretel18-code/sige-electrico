@@ -1,11 +1,87 @@
 [
     {
+        "id": "6acbb4ea874ae052",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
         "id": "21df59d28fe696a3",
         "type": "tab",
         "label": "Clima SIGE",
         "disabled": false,
         "info": "",
         "env": []
+    },
+    {
+        "id": "a5d1baba650f8103",
+        "type": "debug",
+        "z": "6acbb4ea874ae052",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 660,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "f55812ebc3f6bf7d",
+        "type": "exec",
+        "z": "6acbb4ea874ae052",
+        "command": "node \"C:\\Users\\USER\\Downloads\\Practica02_Automatizacion\\estadoProceso.js\"",
+        "addpay": "",
+        "append": "",
+        "useSpawn": "true",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "Ejecutar estadoProceso",
+        "x": 450,
+        "y": 180,
+        "wires": [
+            [
+                "a5d1baba650f8103"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "147f85efccc12fa3",
+        "type": "inject",
+        "z": "6acbb4ea874ae052",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 80,
+        "wires": [
+            [
+                "f55812ebc3f6bf7d"
+            ]
+        ]
     },
     {
         "id": "809faf87b12fa7e7",
@@ -77,7 +153,7 @@
         "type": "function",
         "z": "21df59d28fe696a3",
         "name": "Preparar respuesta clima",
-        "func": "const respuesta = msg.payload;\n\nif (!respuesta || !respuesta.current) {\n\n    msg.statusCode = 502;\n\n    msg.payload = {\n        ok: false,\n        mensaje: \"No se pudo obtener información meteorológica\"\n    };\n\n    return msg;\n}\n\nconst clima = respuesta.current;\n\nmsg.payload = {\n    ok: true,\n\n    latitud: respuesta.latitude,\n    longitud: respuesta.longitude,\n\n    temperatura: clima.temperature_2m,\n    velocidad_viento: clima.wind_speed_10m,\n    precipitacion: clima.precipitation,\n    codigo_clima: clima.weather_code,\n\n    fecha_hora_clima: clima.time\n};\n\nmsg.headers = {\n    \"Content-Type\": \"application/json; charset=utf-8\"\n};\n\nreturn msg;",
+        "func": "let respuesta = msg.payload;\n\nif (typeof respuesta === \"string\") {\n    try {\n        respuesta = JSON.parse(respuesta);\n    } catch (error) {\n        const estadoOriginal = msg.statusCode || null;\n\n        msg.statusCode = 502;\n\n        msg.payload = {\n            ok: false,\n            mensaje: \"Open-Meteo devolvió una respuesta no válida\",\n            estado_open_meteo: estadoOriginal\n        };\n\n        return msg;\n    }\n}\n\nif (!respuesta || !respuesta.current) {\n\n    const estadoOriginal = msg.statusCode || null;\n\n    msg.statusCode = 502;\n\n    msg.payload = {\n        ok: false,\n        mensaje: \"No se pudo obtener información meteorológica\",\n        estado_open_meteo: estadoOriginal,\n        respuesta_open_meteo: respuesta || null\n    };\n\n    return msg;\n}\n\nconst clima = respuesta.current;\n\nmsg.statusCode = 200;\n\nmsg.payload = {\n    ok: true,\n    latitud: respuesta.latitude,\n    longitud: respuesta.longitude,\n    temperatura: clima.temperature_2m,\n    velocidad_viento: clima.wind_speed_10m,\n    precipitacion: clima.precipitation,\n    codigo_clima: clima.weather_code,\n    fecha_hora_clima: clima.time\n};\n\nmsg.headers = {\n    \"Content-Type\": \"application/json; charset=utf-8\"\n};\n\nreturn msg;",
         "outputs": 1,
         "timeout": 0,
         "noerr": 0,

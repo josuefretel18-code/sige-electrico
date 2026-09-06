@@ -5,7 +5,10 @@
 -- ==========================================
 
 
+-- ==========================================
 -- 1. CATEGORÍAS DE INCIDENCIAS
+-- ==========================================
+
 CREATE TABLE IF NOT EXISTS categorias (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(100) UNIQUE NOT NULL,
@@ -14,14 +17,20 @@ CREATE TABLE IF NOT EXISTS categorias (
 );
 
 
+-- ==========================================
 -- 2. ESTADOS DE UNA INCIDENCIA
+-- ==========================================
+
 CREATE TABLE IF NOT EXISTS estados (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(50) UNIQUE NOT NULL
 );
 
 
+-- ==========================================
 -- 3. INFRAESTRUCTURA ELÉCTRICA
+-- ==========================================
+
 CREATE TABLE IF NOT EXISTS infraestructura_electrica (
     id SERIAL PRIMARY KEY,
     codigo VARCHAR(50) UNIQUE NOT NULL,
@@ -34,7 +43,10 @@ CREATE TABLE IF NOT EXISTS infraestructura_electrica (
 );
 
 
+-- ==========================================
 -- 4. INCIDENCIAS
+-- ==========================================
+
 CREATE TABLE IF NOT EXISTS incidencias (
     id BIGSERIAL PRIMARY KEY,
 
@@ -55,16 +67,32 @@ CREATE TABLE IF NOT EXISTS incidencias (
     longitud DOUBLE PRECISION NOT NULL,
 
     origen VARCHAR(20) NOT NULL
-        CHECK (origen IN ('CIUDADANO', 'OPERADOR')),
+        CHECK (
+            origen IN (
+                'CIUDADANO',
+                'OPERADOR'
+            )
+        ),
 
     prioridad VARCHAR(20) DEFAULT 'MEDIA'
-        CHECK (prioridad IN ('BAJA', 'MEDIA', 'ALTA', 'CRITICA')),
+        CHECK (
+            prioridad IN (
+                'BAJA',
+                'MEDIA',
+                'ALTA',
+                'CRITICA'
+            )
+        ),
 
-    fecha_reporte TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    fecha_reporte TIMESTAMPTZ
+        DEFAULT CURRENT_TIMESTAMP
 );
 
 
+-- ==========================================
 -- 5. HISTORIAL DE INCIDENCIAS
+-- ==========================================
+
 CREATE TABLE IF NOT EXISTS historial_incidencias (
     id BIGSERIAL PRIMARY KEY,
 
@@ -79,11 +107,15 @@ CREATE TABLE IF NOT EXISTS historial_incidencias (
 
     observacion TEXT,
 
-    fecha_hora TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    fecha_hora TIMESTAMPTZ
+        DEFAULT CURRENT_TIMESTAMP
 );
 
 
+-- ==========================================
 -- 6. AUDITORÍA
+-- ==========================================
+
 CREATE TABLE IF NOT EXISTS auditoria (
     id BIGSERIAL PRIMARY KEY,
 
@@ -93,30 +125,66 @@ CREATE TABLE IF NOT EXISTS auditoria (
     accion VARCHAR(100) NOT NULL,
 
     tipo_actor VARCHAR(20)
-        CHECK (tipo_actor IN ('CIUDADANO', 'OPERADOR', 'SISTEMA')),
+        CHECK (
+            tipo_actor IN (
+                'CIUDADANO',
+                'OPERADOR',
+                'SISTEMA'
+            )
+        ),
 
     identificador_anonimo VARCHAR(100),
 
-    fecha_hora TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    fecha_hora TIMESTAMPTZ
+        DEFAULT CURRENT_TIMESTAMP
 );
--- 7. Operadores
+
+
+-- ==========================================
+-- 7. OPERADORES
+-- ==========================================
+
 CREATE TABLE IF NOT EXISTS operadores (
     id SERIAL PRIMARY KEY,
-    codigo VARCHAR(30) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    activo BOOLEAN DEFAULT TRUE,
-    fecha_creacion TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+
+    codigo VARCHAR(30)
+        UNIQUE NOT NULL,
+
+    password_hash VARCHAR(255)
+        NOT NULL,
+
+    activo BOOLEAN
+        DEFAULT TRUE,
+
+    fecha_creacion TIMESTAMPTZ
+        DEFAULT CURRENT_TIMESTAMP
 );
--- 7. clima
+
+
+-- ==========================================
+-- 8. CLIMA DE LAS INCIDENCIAS
+-- ==========================================
+
 CREATE TABLE IF NOT EXISTS clima_incidencias (
     id SERIAL PRIMARY KEY,
-    incidencia_id INTEGER NOT NULL,
+
+    incidencia_id BIGINT NOT NULL,
+
     temperatura DECIMAL(5,2),
+
     velocidad_viento DECIMAL(6,2),
+
     precipitacion DECIMAL(6,2),
+
     codigo_clima INTEGER,
+
     descripcion_clima VARCHAR(150),
-    fecha_consulta TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
+    fecha_consulta TIMESTAMPTZ
+        DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_clima_incidencia
+        UNIQUE (incidencia_id),
 
     CONSTRAINT fk_clima_incidencia
         FOREIGN KEY (incidencia_id)
@@ -124,8 +192,14 @@ CREATE TABLE IF NOT EXISTS clima_incidencias (
         ON DELETE CASCADE
 );
 
+
 -- ==========================================
 -- DATOS INICIALES
+-- ==========================================
+
+
+-- ==========================================
+-- ESTADOS INICIALES
 -- ==========================================
 
 INSERT INTO estados (nombre)
@@ -138,13 +212,41 @@ VALUES
 ON CONFLICT (nombre) DO NOTHING;
 
 
-INSERT INTO categorias (nombre, descripcion)
+-- ==========================================
+-- CATEGORÍAS INICIALES
+-- ==========================================
+
+INSERT INTO categorias (
+    nombre,
+    descripcion
+)
 VALUES
-    ('POSTE_CAIDO', 'Poste eléctrico caído'),
-    ('CORTE_ENERGIA', 'Interrupción del servicio eléctrico'),
-    ('TRANSFORMADOR_AVERIADO', 'Falla o avería de transformador'),
-    ('CABLE_CAIDO', 'Cable eléctrico caído o expuesto'),
-    ('ALUMBRADO_PUBLICO', 'Problema de alumbrado público'),
-    ('CORTOCIRCUITO', 'Posible cortocircuito o chisporroteo'),
-    ('OTRO', 'Otro tipo de incidencia eléctrica')
+    (
+        'POSTE_CAIDO',
+        'Poste eléctrico caído'
+    ),
+    (
+        'CORTE_ENERGIA',
+        'Interrupción del servicio eléctrico'
+    ),
+    (
+        'TRANSFORMADOR_AVERIADO',
+        'Falla o avería de transformador'
+    ),
+    (
+        'CABLE_CAIDO',
+        'Cable eléctrico caído o expuesto'
+    ),
+    (
+        'ALUMBRADO_PUBLICO',
+        'Problema de alumbrado público'
+    ),
+    (
+        'CORTOCIRCUITO',
+        'Posible cortocircuito o chisporroteo'
+    ),
+    (
+        'OTRO',
+        'Otro tipo de incidencia eléctrica'
+    )
 ON CONFLICT (nombre) DO NOTHING;

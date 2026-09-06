@@ -98,6 +98,127 @@ def requiere_operador(funcion):
 
     return decorador
 
+def guardar_clima_automatico(
+    incidencia_id,
+    latitud,
+    longitud
+):
+    try:
+        respuesta = requests.get(
+            f"{NODE_RED_URL}/clima",
+            params={
+                "lat": latitud,
+                "lon": longitud
+            },
+            timeout=60
+        )
+
+        if respuesta.status_code != 200:
+            return {
+                "ok": False,
+                "mensaje": "El servicio de clima respondió con error"
+            }
+
+        clima = respuesta.json()
+
+        if not clima.get("ok"):
+            return {
+                "ok": False,
+                "mensaje": "No se pudo obtener información del clima"
+            }
+
+        with obtener_conexion() as conexion:
+            with conexion.cursor() as cursor:
+
+                cursor.execute(
+                    """
+                    SELECT id
+                    FROM clima_incidencias
+                    WHERE incidencia_id = %s
+                    LIMIT 1;
+                    """,
+                    (incidencia_id,)
+                )
+
+                existente = cursor.fetchone()
+
+                if existente:
+                    return {
+                        "ok": True,
+                        "mensaje": "La incidencia ya tiene clima registrado",
+                        "clima_id": existente[0]
+                    }
+
+                cursor.execute(
+                    """
+                    INSERT INTO clima_incidencias (
+                        incidencia_id,
+                        temperatura,
+                        velocidad_viento,
+                        precipitacion,
+                        codigo_clima,
+                        descripcion_clima
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id, fecha_consulta;
+                    """,
+                    (
+                        incidencia_id,
+                        clima.get("temperatura"),
+                        clima.get("velocidad_viento"),
+                        clima.get("precipitacion"),
+                        clima.get("codigo_clima"),
+                        clima.get("descripcion_clima")
+                    )
+                )
+
+                registro = cursor.fetchone()
+
+        return {
+            "ok": True,
+            "mensaje": "Clima registrado automáticamente",
+            "clima_id": registro[0],
+            "temperatura": clima.get("temperatura"),
+            "velocidad_viento": clima.get(
+                "velocidad_viento"
+            ),
+            "precipitacion": clima.get(
+                "precipitacion"
+            ),
+            "codigo_clima": clima.get(
+                "codigo_clima"
+            ),
+            "descripcion_clima": clima.get(
+                "descripcion_clima"
+            ),
+            "fecha_consulta":
+                registro[1].isoformat()
+        }
+
+    except requests.RequestException as error:
+
+        print(
+            f"Error al consultar clima automático: {error}"
+        )
+
+        return {
+            "ok": False,
+            "mensaje":
+                "Incidencia registrada, pero el clima no estuvo disponible"
+        }
+
+    except Exception as error:
+
+        print(
+            f"Error al guardar clima automático: {error}"
+        )
+
+        return {
+            "ok": False,
+            "mensaje":
+                "Incidencia registrada, pero no se pudo guardar el clima"
+        }
+
 @app.get("/")
 def inicio():
     return jsonify({
@@ -321,6 +442,11 @@ def registrar_incidencia():
                     origen,
                     identificador_anonimo
                 ))
+        resultado_clima = guardar_clima_automatico(
+            incidencia_id,
+            latitud,
+            longitud
+        )
 
         return jsonify({
             "ok": True,
@@ -330,7 +456,8 @@ def registrar_incidencia():
                 "codigo": codigo,
                 "estado": "PENDIENTE_VALIDACION",
                 "prioridad": prioridad
-            }
+            },
+            "clima": resultado_clima
         }), 201
 
     except ValueError:
@@ -703,123 +830,96 @@ def login_operador():
             "error": str(error)
         }), 500
 
-@app.post("/api/incidencias/<int:incidencia_id>/clima")
+@app.get("/api/incidencias/<int:incidencia_id>/clima")
 @requiere_operador
-def consultar_clima_incidencia(incidencia_id):
+def obtener_clima_incidencia(incidencia_id):
+
     conexion = None
 
     try:
+
         conexion = obtener_conexion()
 
-        # 1. Obtener coordenadas de la incidencia
         with conexion.cursor() as cursor:
+
             cursor.execute(
                 """
-                SELECT id, latitud, longitud
-                FROM incidencias
-                WHERE id = %s
+                SELECT
+                    id,
+                    temperatura,
+                    velocidad_viento,
+                    precipitacion,
+                    codigo_clima,
+                    descripcion_clima,
+                    fecha_consulta
+                FROM clima_incidencias
+                WHERE incidencia_id = %s
+                ORDER BY fecha_consulta ASC
+                LIMIT 1;
                 """,
                 (incidencia_id,)
             )
 
-            incidencia = cursor.fetchone()
+            clima = cursor.fetchone()
 
-        if not incidencia:
+
+        if not clima:
+
             return jsonify({
                 "ok": False,
-                "mensaje": "Incidencia no encontrada"
+                "mensaje":
+                    "No existe clima registrado para esta incidencia"
             }), 404
 
-        latitud = float(incidencia[1])
-        longitud = float(incidencia[2])
-
-        # 2. Consultar Node-RED
-        respuesta = requests.get(
-            f"{NODE_RED_URL}/clima",
-            params={
-                "lat": latitud,
-                "lon": longitud
-            },
-            timeout=60
-        )
-
-        if respuesta.status_code != 200:
-            return jsonify({
-                "ok": False,
-                "mensaje": "El servicio de clima respondió con error"
-            }), 502
-
-        clima = respuesta.json()
-
-        if not clima.get("ok"):
-            return jsonify({
-                "ok": False,
-                "mensaje": "No se pudo obtener información del clima"
-            }), 502
-
-        # 3. Guardar clima en Aiven
-        with conexion.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO clima_incidencias (
-                    incidencia_id,
-                    temperatura,
-                    velocidad_viento,
-                    precipitacion,
-                    codigo_clima
-                )
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING id, fecha_consulta
-                """,
-                (
-                    incidencia_id,
-                    clima.get("temperatura"),
-                    clima.get("velocidad_viento"),
-                    clima.get("precipitacion"),
-                    clima.get("codigo_clima")
-                )
-            )
-
-            registro = cursor.fetchone()
-
-        conexion.commit()
 
         return jsonify({
             "ok": True,
-            "mensaje": "Clima consultado y registrado correctamente",
-            "clima_id": registro[0],
+            "clima_id": clima[0],
             "incidencia_id": incidencia_id,
-            "temperatura": clima.get("temperatura"),
-            "velocidad_viento": clima.get("velocidad_viento"),
-            "precipitacion": clima.get("precipitacion"),
-            "codigo_clima": clima.get("codigo_clima"),
-            "descripcion_clima": clima.get("descripcion_clima"),
-            "fecha_consulta": registro[1].isoformat()
-        }), 201
 
-    except requests.RequestException as error:
-        if conexion:
-            conexion.rollback()
+            "temperatura":
+                float(clima[1])
+                if clima[1] is not None
+                else None,
 
-        print(f"Error Node-RED: {error}")
+            "velocidad_viento":
+                float(clima[2])
+                if clima[2] is not None
+                else None,
 
-        return jsonify({
-            "ok": False,
-            "mensaje": "No se pudo conectar con el servicio de clima"
-        }), 502
+            "precipitacion":
+                float(clima[3])
+                if clima[3] is not None
+                else None,
+
+            "codigo_clima": clima[4],
+
+            "descripcion_clima":
+                clima[5],
+
+            "fecha_consulta":
+                clima[6].isoformat()
+                if clima[6]
+                else None
+
+        }), 200
+
 
     except Exception as error:
-        if conexion:
-            conexion.rollback()
 
-        print(f"Error al consultar clima: {error}")
+        print(
+            f"Error al obtener clima: {error}"
+        )
 
         return jsonify({
             "ok": False,
-            "mensaje": "Error interno al consultar el clima"
+            "mensaje":
+                "Error interno al obtener el clima"
         }), 500
 
+
     finally:
+
         if conexion:
             conexion.close()
        

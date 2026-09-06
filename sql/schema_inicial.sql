@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS clima_incidencias (
     velocidad_viento DECIMAL(6,2),
     precipitacion DECIMAL(6,2),
     codigo_clima INTEGER,
+    descripcion_clima VARCHAR(150),
     fecha_consulta TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_clima_incidencia
